@@ -16,10 +16,10 @@ TD.LAYOUT.GRID_Y = TD.LAYOUT.HUD_H;
 TD.LAYOUT.GRID_H = TD.LAYOUT.ROWS * TD.LAYOUT.CELL;
 TD.LAYOUT.BAR_Y = TD.LAYOUT.GRID_Y + TD.LAYOUT.GRID_H;
 
-TD.FONT = '"Chakra Petch", "Helvetica Neue", Arial, sans-serif';
+TD.FONT = '"Kenney Future", "Helvetica Neue", Arial, sans-serif';
 
 TD.COLOURS = {
-  bg: 0x151a14,
+  bg: 0x2b8a4a,
   board: 0x1f261d,
   gridLine: 0x2a3327,
   spawn: 0x5a3b1e,
@@ -53,16 +53,13 @@ function startGame() {
     backgroundColor: TD.COLOURS.bg,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     input: { activePointers: 2 },
-    scene: [TD.MenuScene, TD.GameScene],
+    scene: [TD.BootScene, TD.MenuScene, TD.GameScene],
   };
   TD.game = new Phaser.Game(config);
 }
 
 if (document.fonts && document.fonts.load) {
-  Promise.all([
-    document.fonts.load('700 20px "Chakra Petch"'),
-    document.fonts.load('500 20px "Chakra Petch"'),
-  ]).then(startGame, startGame);
+  document.fonts.load('20px "Kenney Future"').then(startGame, startGame);
 } else {
   startGame();
 }

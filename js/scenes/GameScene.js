@@ -6,9 +6,17 @@
 
 window.TD = window.TD || {};
 
-const KIND_TEX = { inf: ['inf0', 'inf1'], buggy: ['buggy'], tank: ['tank'], heli: ['heli0', 'heli1'], boss: ['boss'] };
-const KIND_SCALE = { inf: 0.42, buggy: 0.5, tank: 0.5, heli: 0.5, boss: 0.62 };
-const KIND_RADIUS = { inf: 9, buggy: 11, tank: 12, heli: 11, boss: 20 };
+// Unit looks. 'up' sprites point up in the source art, 'right' sprites point right.
+const KIND = {
+  inf:   { body: 'e_inf', face: 'up',    scale: 0.40, radius: 9 },
+  buggy: { body: 'mini_tank_red', face: 'up',   scale: 0.36, radius: 11 },
+  tank:  { body: 'e_tank', gun: 'e_tank_gun', face: 'right', scale: 0.38, radius: 12 },
+  heli:  { body: 'e_heli', shadow: 'plane_shadow', face: 'up', scale: 0.44, radius: 11 },
+  boss:  { body: 'e_boss', gun: 'e_boss_gun', face: 'right', scale: 0.62, radius: 20 },
+};
+const TILE = 45 / 128;               // art is 128px, a cell is 45px
+const TURRET_TEX = ['turret_226', 'turret_227', 'turret_203', 'turret_228', 'turret_204', 'turret_205', 'turret_206'];
+const TURRET_SCALE = [0.34, 0.36, 0.36, 0.38, 0.38, 0.40, 0.42];
 
 TD.GameScene = class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
@@ -22,7 +30,6 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   create() {
     const L = TD.LAYOUT;
-    TD.ART.install(this, TD.FACTIONS);
     this.grid = new TD.Grid(L.COLS, L.ROWS);
 
     this.gold = TD.ECON.startGold;
@@ -81,9 +88,11 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     for (let row = 0; row < L.ROWS; row++) {
       for (let c = 0; c < L.COLS; c++) {
-        const key = row === this.grid.spawn.r ? 'road' + (c % 2) : 'grass' + Math.floor(r() * 4);
-        const img = this.add.image(this.cellX(c), this.cellY(row), key).setScale(0.5);
-        if (r() < 0.5) img.setFlipX(true);
+        const isRoad = row === this.grid.spawn.r;
+        const g = r();
+        const key = isRoad ? (r() < 0.5 ? 'stone' : 'stone2') : (g < 0.2 ? 'grass_b' : g < 0.35 ? 'grass_c' : 'grass_a');
+        const img = this.add.image(this.cellX(c), this.cellY(row), key).setScale(TILE * 1.02);
+        img.setAngle(90 * Math.floor(r() * 4));
         ground.add(img);
       }
     }
@@ -98,40 +107,56 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   decorate() {
     const L = TD.LAYOUT, s = this.grid.spawn, e = this.grid.exit;
-    // trees and rocks along the exit row, bunker in the middle
+    const deco = [['tree_big', 0.4], ['tree_round', 0.42], ['bush', 0.36], ['shrub', 0.36], ['rock_l', 0.34], ['rock_m', 0.3], ['plant', 0.34]];
     for (let c = 0; c < L.COLS; c++) {
       if (c === e.c || c === e.c + 1) continue;
-      const key = c % 3 === 0 ? 'tree' + (c % 3) : c % 4 === 1 ? 'rock' + (c % 2) : 'bush' + (c % 2);
-      this.decoLayer.add(this.add.image(this.cellX(c) + (c % 2 ? 6 : -4), this.cellY(e.r) + 2, key).setScale(0.5));
+      const [key, sc] = deco[(c * 5) % deco.length];
+      this.decoLayer.add(this.add.image(this.cellX(c) + ((c % 2) ? 5 : -5), this.cellY(e.r) + ((c % 3) ? 3 : -3), key).setScale(sc));
     }
-    this.decoLayer.add(this.add.image(this.cellX(e.c) + L.CELL / 2, this.cellY(e.r), 'bunker_' + this.factionId).setScale(0.5));
-    // wreckage and rocks on the road
-    for (const c of [1, 4, 9]) this.decoLayer.add(this.add.image(this.cellX(c), this.cellY(s.r), c === 4 ? 'wreck' : 'rock1').setScale(0.45).setAlpha(0.9));
-    this.add.text(6, this.cellY(s.r) - 20, 'Enemies enter', { fontFamily: TD.FONT, fontSize: '12px', color: '#f1d9a8', backgroundColor: '#00000066', padding: { x: 4, y: 1 } }).setDepth(2);
+    // HQ: two plates, a big turret and the faction flag
+    const hx = this.cellX(e.c) + L.CELL / 2, hy = this.cellY(e.r);
+    this.decoLayer.add(this.add.image(this.cellX(e.c), hy, 'plate').setScale(TILE));
+    this.decoLayer.add(this.add.image(this.cellX(e.c + 1), hy, 'plate').setScale(TILE));
+    this.decoLayer.add(this.add.image(hx, hy + 2, 'turret_229_' + this.factionId).setScale(0.5).setAngle(180));
+    this.decoLayer.add(this.add.image(hx + 26, hy - 14, 'flag_' + this.factionId).setScale(0.22));
+    // scattered detail in the field (towers build over it)
+    let seed = 99; const rr = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const bits = [['plant', 0.26], ['bush', 0.22], ['rock_s', 0.24], ['shrub', 0.24], ['crater3', 0.24], ['rock_m', 0.22]];
+    for (let i = 0; i < 16; i++) {
+      const c = Math.floor(rr() * L.COLS), r = 1 + Math.floor(rr() * (L.ROWS - 2));
+      if (c === s.c || c === s.c + 1 || c === s.c - 1) continue;
+      const [key, sc] = bits[Math.floor(rr() * bits.length)];
+      this.decoLayer.add(this.add.image(this.cellX(c) + (rr() - 0.5) * 20, this.cellY(r) + (rr() - 0.5) * 20, key).setScale(sc).setAlpha(0.85).setAngle(rr() * 360));
+    }
+    // craters and rocks on the entry road
+    for (const [c, key] of [[1, 'crater'], [4, 'crater3'], [9, 'crater2'], [10, 'rock_s']]) this.decoLayer.add(this.add.image(this.cellX(c), this.cellY(s.r), key).setScale(0.32).setAlpha(0.8));
+    this.add.text(6, this.cellY(s.r) - 20, 'ENEMY LINE', { fontFamily: TD.FONT, fontSize: '11px', color: '#ffffff', backgroundColor: '#00000088', padding: { x: 4, y: 1 } }).setDepth(2);
   }
 
   buildPathTiles() {
-    const L = TD.LAYOUT;
-    this.pathTiles = [];
-    for (let row = 0; row < L.ROWS; row++) {
-      for (let c = 0; c < L.COLS; c++) {
-        const img = this.add.image(this.cellX(c), this.cellY(row), 'dirt' + ((row + c) % 4)).setScale(0.5).setVisible(false);
-        this.pathLayer.add(img);
-        this.pathTiles[row * L.COLS + c] = img;
-      }
-    }
+    this.pathGfx = this.add.graphics();
+    this.pathLayer.add(this.pathGfx);
     this.redrawPath();
   }
 
+  // The dirt trail follows the current route: a thick rounded line in the
+  // art pack's dirt colour, with a darker edge.
   redrawPath() {
-    const L = TD.LAYOUT;
-    for (const t of this.pathTiles) t.setVisible(false);
+    const g = this.pathGfx;
+    g.clear();
     const p = this.grid.path;
-    if (!p) return;
-    for (const cell of p) {
-      if (cell.r === this.grid.spawn.r) continue;
-      this.pathTiles[cell.r * L.COLS + cell.c].setVisible(true);
-    }
+    if (!p || p.length < 2) return;
+    const pts = p.map((c) => ({ x: this.cellX(c.c), y: this.cellY(c.r) }));
+    const draw = (width, colour) => {
+      g.lineStyle(width, colour, 1);
+      g.beginPath(); g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.strokePath();
+      g.fillStyle(colour, 1);
+      for (const q of pts) g.fillCircle(q.x, q.y, width / 2);
+    };
+    draw(34, 0x9c7a4a);
+    draw(28, 0xc09159);
   }
 
   // Enemies of the next wave gather at the entrance during the build phase
@@ -143,7 +168,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const n = next.kind === 'boss' ? 1 : 4;
     for (let i = 0; i < n; i++) {
       const x = this.cellX(this.grid.spawn.c) + (i - (n - 1) / 2) * 26;
-      const spr = this.add.image(x, this.cellY(this.grid.spawn.r) - 4, KIND_TEX[next.kind][0]).setScale(KIND_SCALE[next.kind] * 0.9).setRotation(Math.PI);
+      const k = KIND[next.kind];
+      const spr = this.add.image(x, this.cellY(this.grid.spawn.r) - 4, k.body).setScale(k.scale * 0.9).setRotation(k.face === 'up' ? Math.PI : Math.PI / 2);
       spr.baseX = x;
       (next.flying ? this.airLayer : this.groundLayer).add(spr);
       this.massing.push(spr);
@@ -156,10 +182,13 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const L = TD.LAYOUT, C = TD.COLOURS;
     this.add.rectangle(0, 0, L.W, L.HUD_H, 0x10140f).setOrigin(0).setDepth(9);
     this.add.rectangle(0, 0, 8, L.HUD_H, this.faction.colour).setOrigin(0).setDepth(9);
-    this.hudFaction = this.add.text(22, 10, this.faction.name, { fontFamily: TD.FONT, fontSize: '18px', fontStyle: '700', color: this.faction.colourHex }).setDepth(9);
-    this.hudWave = this.add.text(22, 36, '', { fontFamily: TD.FONT, fontSize: '16px', color: C.text }).setDepth(9);
-    this.hudGold = this.add.text(L.W - 20, 10, '', { fontFamily: TD.FONT, fontSize: '22px', fontStyle: '700', color: C.gold }).setOrigin(1, 0).setDepth(9);
-    this.hudLives = this.add.text(L.W - 20, 40, '', { fontFamily: TD.FONT, fontSize: '16px', color: C.text }).setOrigin(1, 0).setDepth(9);
+    this.add.image(30, 22, 'flag_' + this.factionId).setScale(0.2).setDepth(9);
+    this.hudFaction = this.add.text(48, 10, this.faction.name, { fontFamily: TD.FONT, fontSize: '18px', color: this.faction.colourHex }).setDepth(9);
+    this.hudWave = this.add.text(48, 36, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.text }).setDepth(9);
+    this.add.image(L.W - 118, 22, 'coin').setScale(0.24).setDepth(9);
+    this.hudGold = this.add.text(L.W - 100, 10, '', { fontFamily: TD.FONT, fontSize: '22px', color: C.gold }).setOrigin(0, 0).setDepth(9);
+    this.add.image(L.W - 118, 50, 'ui_shield').setScale(0.16).setDepth(9);
+    this.hudLives = this.add.text(L.W - 100, 40, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.text }).setOrigin(0, 0).setDepth(9);
     this.hudWaveName = this.add.text(L.W / 2, 10, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.muted }).setOrigin(0.5, 0).setDepth(9);
     this.hudCore = this.add.text(L.W / 2, 38, '', { fontFamily: TD.FONT, fontSize: '13px', color: '#ffd166' }).setOrigin(0.5, 0).setDepth(9);
     this.banner = this.add.text(L.W / 2, L.GRID_Y + 140, '', { fontFamily: TD.FONT, fontSize: '22px', fontStyle: '700', color: C.text, backgroundColor: '#10140fd9', padding: { x: 14, y: 8 }, align: 'center' }).setOrigin(0.5).setAlpha(0).setDepth(20);
@@ -171,8 +200,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   }
 
   updateHud() {
-    this.hudGold.setText(this.gold + ' gold');
-    this.hudLives.setText(this.lives + (this.lives === 1 ? ' life' : ' lives'));
+    this.hudGold.setText(String(this.gold));
+    this.hudLives.setText(String(this.lives));
     const shown = this.phase === 'wave' ? this.wave : this.wave + 1;
     this.hudWave.setText('Wave ' + shown + (this.phase === 'build' ? ' in ' + Math.ceil(this.countdown) + 's' : ''));
     const next = TD.getWave(shown);
@@ -189,21 +218,30 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- bar
 
-  makeButton(x, y, w, h, label, onTap, depth) {
+  makeButton(x, y, w, h, label, onTap, depth, icon) {
     const rect = this.add.rectangle(x, y, w, h, 0x232b21).setOrigin(0).setStrokeStyle(2, 0x3a4536).setInteractive({ useHandCursor: true }).setDepth(depth || 9);
-    const txt = this.add.text(x + w / 2, y + h / 2, label, { fontFamily: TD.FONT, fontSize: '15px', fontStyle: '700', color: TD.COLOURS.text, align: 'center' }).setOrigin(0.5).setDepth(depth || 9);
+    const ix = icon ? x + 22 : x + w / 2;
+    const txt = this.add.text(icon ? ix + 16 : ix, y + h / 2, label, { fontFamily: TD.FONT, fontSize: '13px', color: TD.COLOURS.text, align: icon ? 'left' : 'center' }).setOrigin(icon ? 0 : 0.5, 0.5).setDepth(depth || 9);
+    const img = icon ? this.add.image(ix, y + h / 2, 'ui_' + icon).setScale(0.22).setDepth(depth || 9) : null;
     rect.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); TD.SFX.unlock(); onTap(); });
-    return { rect, txt, setLabel: (s) => txt.setText(s) };
+    return { rect, txt, img, setLabel: (s) => txt.setText(s) };
   }
 
   buildBar() {
     const L = TD.LAYOUT;
     this.add.rectangle(0, L.BAR_Y, L.W, L.BAR_H, 0x10140f).setOrigin(0).setDepth(9);
     const y = L.BAR_Y + 10, h = L.BAR_H - 20;
-    this.btnTower = this.makeButton(10, y, 120, h, '', () => this.setBuildMode('tower'));
-    this.btnWall = this.makeButton(140, y, 100, h, '', () => this.setBuildMode('wall'));
-    this.btnStart = this.makeButton(250, y, 200, h, '', () => this.startWaveNow());
-    this.btnSpeed = this.makeButton(460, y, 70, h, '1x', () => this.toggleSpeed());
+    this.btnTower = this.makeButton(10, y, 118, h, '', () => this.setBuildMode('tower'));
+    this.btnWall = this.makeButton(134, y, 96, h, '', () => this.setBuildMode('wall'));
+    this.btnStart = this.makeButton(236, y, 176, h, '', () => this.startWaveNow(), 9, 'next');
+    this.btnSpeed = this.makeButton(418, y, 54, h, '', () => this.toggleSpeed(), 9, 'fastForward');
+    this.btnSound = this.makeButton(478, y, 52, h, '', () => { const m = TD.SFX.toggle(); this.btnSound.img.setTexture(m ? 'ui_audioOff' : 'ui_audioOn'); }, 9, 'audioOn');
+    this.btnSpeed.img.setPosition(445, y + h / 2); this.btnSpeed.txt.setPosition(445, y + h - 12).setOrigin(0.5).setFontSize(11);
+    this.btnSound.img.setPosition(504, y + h / 2);
+    // little previews on the build buttons
+    this.add.image(32, y + h / 2, 'plate').setScale(0.22).setDepth(9);
+    this.add.image(32, y + h / 2, TURRET_TEX[0] + '_' + this.factionId).setScale(0.24).setDepth(9);
+    this.add.image(156, y + h / 2, 'rock_l').setScale(0.24).setDepth(9);
     this.setBuildMode('tower');
     this.updateBar();
   }
@@ -211,15 +249,15 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   updateBar() {
     if (!this.btnTower) return;
     const tierCost = this.faction.tiers[0].cost;
-    this.btnTower.setLabel('Tower\n' + tierCost + ' gold');
-    this.btnWall.setLabel('Wall\n' + this.faction.wallCost + ' gold');
+    this.btnTower.setLabel('TOWER\n' + tierCost + ' gold').setPosition(84, this.btnTower.rect.y + this.btnTower.rect.height / 2);
+    this.btnWall.setLabel('WALL\n' + this.faction.wallCost + ' gold').setPosition(194, this.btnWall.rect.y + this.btnWall.rect.height / 2);
     this.btnTower.txt.setColor(this.gold >= tierCost ? TD.COLOURS.text : TD.COLOURS.muted);
     this.btnWall.txt.setColor(this.gold >= this.faction.wallCost ? TD.COLOURS.text : TD.COLOURS.muted);
     if (this.phase === 'build') {
-      this.btnStart.setLabel('Send wave ' + (this.wave + 1) + ' now');
+      this.btnStart.setLabel('SEND WAVE ' + (this.wave + 1) + '\nor wait ' + Math.ceil(this.countdown) + 's');
       this.btnStart.rect.setFillStyle(0x2f4a2c);
     } else {
-      this.btnStart.setLabel('Wave ' + this.wave + '\n' + (this.enemies.length + this.spawnQueue) + ' remaining');
+      this.btnStart.setLabel('WAVE ' + this.wave + '\n' + (this.enemies.length + this.spawnQueue) + ' remaining');
       this.btnStart.rect.setFillStyle(0x232b21);
     }
     this.btnSpeed.setLabel(this.speedMult + 'x');
@@ -245,11 +283,11 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const bg = this.add.rectangle(0, 0, L.W, 130, 0x10140f, 0.97).setOrigin(0).setStrokeStyle(2, 0x3a4536).setInteractive();
     this.panelTitle = this.add.text(16, 10, '', { fontFamily: TD.FONT, fontSize: '19px', fontStyle: '700', color: this.faction.colourHex });
     this.panelStats = this.add.text(16, 40, '', { fontFamily: TD.FONT, fontSize: '14px', color: TD.COLOURS.text, lineSpacing: 3 });
-    this.panelUpgrade = this.makeButton(300, 12, 220, 48, '', () => this.upgradeSelected(), 0);
-    this.panelSell = this.makeButton(300, 70, 105, 44, '', () => this.sellSelected(), 0);
-    this.panelClose = this.makeButton(415, 70, 105, 44, 'Close', () => this.closePanel(), 0);
+    this.panelUpgrade = this.makeButton(290, 12, 234, 48, '', () => this.upgradeSelected(), 0, 'wrench');
+    this.panelSell = this.makeButton(290, 70, 120, 44, '', () => this.sellSelected(), 0, 'trashcan');
+    this.panelClose = this.makeButton(420, 70, 104, 44, 'CLOSE', () => this.closePanel(), 0, 'cross');
     this.panel.add([bg, this.panelTitle, this.panelStats,
-      this.panelUpgrade.rect, this.panelUpgrade.txt, this.panelSell.rect, this.panelSell.txt, this.panelClose.rect, this.panelClose.txt]);
+      this.panelUpgrade.rect, this.panelUpgrade.txt, this.panelUpgrade.img, this.panelSell.rect, this.panelSell.txt, this.panelSell.img, this.panelClose.rect, this.panelClose.txt, this.panelClose.img]);
   }
 
   openPanel(t) { this.selected = t; this.panel.setVisible(true); this.refreshPanel(); this.redrawRange(); }
@@ -259,8 +297,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const t = this.selected;
     if (!t) return;
     if (t.type === 'wall') {
-      this.panelTitle.setText('Sandbag wall');
-      this.panelStats.setText('Blocks the path. No attack.\nSell for ' + this.sellValue(t) + ' gold.');
+      this.panelTitle.setText('Barricade');
+      this.panelStats.setText('Blocks the route. No attack.\nCheap way to shape the maze.');
       this.panelUpgrade.rect.setVisible(false); this.panelUpgrade.txt.setVisible(false);
     } else {
       const s = this.towerStats(t);
@@ -341,7 +379,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   finishConstruction(t) {
     t.building = 0;
     t.site.setVisible(false);
-    if (t.type === 'tower') { t.turret.setTexture('turret_' + this.factionId + '_' + t.tier).setVisible(true); }
+    if (t.type === 'tower') { t.turret.setTexture(TURRET_TEX[t.tier - 1] + '_' + this.factionId).setScale(TURRET_SCALE[t.tier - 1]).setVisible(true); }
     else t.wallImg.setVisible(true);
     TD.SFX.done();
     if (this.selected === t) this.refreshPanel();
@@ -387,15 +425,16 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     this.grid.place(c, r, isWall ? 'wall' : 'tower');
     const x = this.cellX(c), y = this.cellY(r);
     const t = { c, r, type: isWall ? 'wall' : 'tower', tier: 1, overclock: 0, value: cost, cooldown: 0, building: 0, sprites: [] };
-    t.site = this.add.image(x, y, 'construction0').setScale(0.5).setVisible(false);
+    t.site = this.add.image(x, y, 'site').setScale(TILE).setVisible(false);
     if (isWall) {
-      t.wallImg = this.add.image(x, y, 'wall').setScale(0.5);
-      t.sprites.push(t.wallImg, t.site);
-      this.towerLayer.add([t.wallImg, t.site]);
+      t.plate = this.add.image(x, y, 'plate3').setScale(TILE);
+      t.wallImg = this.add.image(x, y - 2, 'rock_l').setScale(0.3);
+      t.sprites.push(t.plate, t.wallImg, t.site);
+      this.towerLayer.add([t.plate, t.wallImg, t.site]);
     } else {
-      t.base = this.add.image(x, y, 'base_' + this.factionId).setScale(0.5);
-      t.turret = this.add.image(x, y, 'turret_' + this.factionId + '_1').setScale(0.5);
-      t.flash = this.add.image(x, y, 'muzzle').setScale(0.6).setVisible(false);
+      t.base = this.add.image(x, y, 'plate').setScale(TILE);
+      t.turret = this.add.image(x, y, TURRET_TEX[0] + '_' + this.factionId).setScale(TURRET_SCALE[0]);
+      t.flash = this.add.image(x, y, 'flash').setScale(0.25).setVisible(false);
       t.sprites.push(t.base, t.turret, t.site, t.flash);
       this.towerLayer.add([t.base, t.turret, t.site]);
       this.fxLayer.add(t.flash);
@@ -447,17 +486,18 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   spawnEnemy() {
     const w = this.currentWave, s = this.grid.spawn;
-    const kind = w.kind;
+    const kind = w.kind, k = KIND[kind];
     const e = {
-      def: w, kind, hp: w.hp, maxHp: w.hp, armour: w.armour, speed: w.speed, flying: w.flying, boss: !!w.boss,
+      def: w, kind, k, hp: w.hp, maxHp: w.hp, armour: w.armour, speed: w.speed, flying: w.flying, boss: !!w.boss,
       x: this.cellX(s.c) + (Math.random() - 0.5) * 14, y: this.cellY(s.r) - 20, slowUntil: 0, slowAmt: 0, dead: false,
-      path: w.flying ? null : this.grid.path.slice(), pathIdx: 0, angle: Math.PI / 2, frame: 0, radius: KIND_RADIUS[kind],
+      path: w.flying ? null : this.grid.path.slice(), pathIdx: 0, angle: Math.PI / 2, radius: k.radius, bob: Math.random() * 6,
     };
-    e.sprite = this.add.image(e.x, e.y, KIND_TEX[kind][0]).setScale(KIND_SCALE[kind]);
-    if (e.flying) {
-      e.shadow = this.add.image(e.x + 10, e.y + 14, KIND_TEX[kind][0]).setScale(KIND_SCALE[kind]).setTint(0x000000).setAlpha(0.35);
-      this.airLayer.add([e.shadow, e.sprite]);
-    } else this.groundLayer.add(e.sprite);
+    const layer = e.flying ? this.airLayer : this.groundLayer;
+    if (k.shadow) { e.shadow = this.add.image(e.x + 12, e.y + 16, k.shadow).setScale(k.scale); layer.add(e.shadow); }
+    e.sprite = this.add.image(e.x, e.y, k.body).setScale(k.scale);
+    layer.add(e.sprite);
+    if (k.gun) { e.gun = this.add.image(e.x, e.y, k.gun).setScale(k.scale); layer.add(e.gun); }
+    if (e.boss) { e.crown = this.add.image(e.x, e.y - 26, 'crown_gold').setScale(0.16); this.fxLayer.add(e.crown); }
     this.enemies.push(e);
   }
 
@@ -498,7 +538,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     for (const t of this.towers) {
       if (t.building > 0) {
         t.building -= dt;
-        t.site.setTexture('construction' + (Math.floor(this.animClock * 6) % 4));
+        t.site.setAlpha(0.6 + 0.4 * Math.abs(Math.sin(this.animClock * 6)));
         if (t.building <= 0) this.finishConstruction(t);
       }
     }
@@ -549,7 +589,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     this.updateHud();
   }
 
-  destroyEnemySprites(e) { e.sprite.destroy(); if (e.shadow) e.shadow.destroy(); }
+  destroyEnemySprites(e) { e.sprite.destroy(); if (e.shadow) e.shadow.destroy(); if (e.gun) e.gun.destroy(); if (e.crown) e.crown.destroy(); }
 
   urgency(e) {
     if (e.flying) return -Math.hypot(this.cellX(this.grid.exit.c) - e.x, this.cellY(this.grid.exit.r) - e.y);
@@ -575,9 +615,9 @@ TD.GameScene = class GameScene extends Phaser.Scene {
       t.turret.setRotation(ang + Math.PI / 2);
       if (t.cooldown > 0) continue;
       t.cooldown = s.cooldown;
-      const tex = t.tier >= 7 ? 'bolt' : (t.tier === 3 || t.tier === 5 || t.tier === 6) ? 'shell' : 'bullet';
+      const tex = t.tier >= 5 ? 'missile_s' : t.tier === 3 ? 'bullet_orange' : 'bullet_small';
       const bx = tx + Math.cos(ang) * 16, by = ty + Math.sin(ang) * 16;
-      const img = this.add.image(bx, by, tex).setRotation(ang + Math.PI / 2);
+      const img = this.add.image(bx, by, tex).setScale(t.tier >= 5 ? 0.3 : 0.22).setRotation(ang + Math.PI / 2);
       this.bulletLayer.add(img);
       this.bullets.push({ x: bx, y: by, target: best, damage: s.damage, splash: s.splash, slow: s.slow, speed: 13 * L.CELL, img });
       t.flash.setPosition(bx, by).setRotation(ang).setVisible(true).setAlpha(1);
@@ -630,20 +670,20 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------ effects
 
   boom(x, y, scale, leaveWreck) {
-    const img = this.add.image(x, y, 'boom0').setScale(scale);
+    const img = this.add.image(x, y, 'flame_296').setScale(scale * 0.8);
     this.fxLayer.add(img);
-    this.effects.push({ kind: 'boom', img, life: 0.36, total: 0.36 });
+    this.effects.push({ kind: 'boom', img, life: 0.4, total: 0.4, scale });
     if (leaveWreck) {
-      const w = this.add.image(x, y, 'wreck').setScale(0.4 * scale + 0.2).setRotation(Math.random() * 6.28);
+      const w = this.add.image(x, y, ['crater', 'crater2', 'crater3'][Math.floor(Math.random() * 3)]).setScale(0.28 * scale + 0.12).setRotation(Math.random() * 6.28).setAlpha(0.8);
       this.decoLayer.add(w);
-      this.effects.push({ kind: 'wreck', img: w, life: 6, total: 6 });
+      this.effects.push({ kind: 'wreck', img: w, life: 8, total: 8 });
     }
   }
 
   spark(x, y) {
-    const img = this.add.image(x, y, 'boom0').setScale(0.22);
+    const img = this.add.image(x, y, 'flash').setScale(0.14).setAlpha(0.9);
     this.fxLayer.add(img);
-    this.effects.push({ kind: 'boom', img, life: 0.14, total: 0.14 });
+    this.effects.push({ kind: 'spark', img, life: 0.12, total: 0.12 });
   }
 
   floatText(x, y, text) {
@@ -655,7 +695,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     for (const f of this.effects) {
       f.life -= dt;
       const p = 1 - f.life / f.total;
-      if (f.kind === 'boom') f.img.setTexture('boom' + Math.min(3, Math.floor(p * 4)));
+      if (f.kind === 'boom') { f.img.setTexture(['flame_296', 'flame_298', 'flame_295', 'flame_297'][Math.min(3, Math.floor(p * 4))]).setScale(f.scale * (0.6 + p * 0.8)).setAlpha(1 - p * 0.7); }
+      else if (f.kind === 'spark') f.img.setRotation(p * 2);
       else if (f.kind === 'text') { f.img.y -= 30 * dt; f.img.setAlpha(Math.min(1, f.life * 2)); }
       else if (f.kind === 'wreck') f.img.setAlpha(Math.min(0.9, f.life));
       if (f.life <= 0) f.img.destroy();
@@ -667,12 +708,15 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   render() {
     const g = this.barGfx;
     g.clear();
-    const frame = Math.floor(this.animClock * 8) % 2;
     for (const e of this.enemies) {
-      const texs = KIND_TEX[e.kind];
-      if (texs.length > 1) e.sprite.setTexture(texs[e.flying ? Math.floor(this.animClock * 20) % 2 : frame]);
-      e.sprite.setPosition(e.x, e.y).setRotation(e.angle + Math.PI / 2);
-      if (e.shadow) e.shadow.setPosition(e.x + 10, e.y + 16).setRotation(e.angle + Math.PI / 2).setTexture(e.sprite.texture.key);
+      const k = e.k;
+      const rot = e.angle + (k.face === 'up' ? Math.PI / 2 : 0);
+      let bob = 0;
+      if (e.kind === 'inf') bob = Math.sin(this.animClock * 14 + e.bob) * 1.5;
+      e.sprite.setPosition(e.x, e.y + bob).setRotation(rot);
+      if (e.gun) e.gun.setPosition(e.x, e.y).setRotation(rot);
+      if (e.shadow) e.shadow.setPosition(e.x + 12, e.y + 16 + Math.sin(this.animClock * 3 + e.bob) * 2).setRotation(rot);
+      if (e.crown) e.crown.setPosition(e.x, e.y - 30);
       const w = e.boss ? 44 : 22, hpf = Math.max(0, e.hp / e.maxHp), by = e.y - e.radius - 8;
       g.fillStyle(0x000000, 0.6); g.fillRect(e.x - w / 2, by, w, 4);
       g.fillStyle(hpf > 0.5 ? 0x7fd08a : hpf > 0.25 ? 0xf0c85a : 0xe5533d, 1); g.fillRect(e.x - w / 2, by, w * hpf, 4);
@@ -691,8 +735,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.massing.length; i++) {
       const m = this.massing[i];
       m.x = m.baseX + Math.sin(this.animClock * 2 + i) * 3;
-      const texs = KIND_TEX[TD.getWave(this.wave + 1).kind];
-      if (texs.length > 1) m.setTexture(texs[Math.floor(this.animClock * 6 + i) % 2]);
+      m.y = this.cellY(this.grid.spawn.r) - 4 + Math.sin(this.animClock * 5 + i * 2) * 1.5;
     }
   }
 

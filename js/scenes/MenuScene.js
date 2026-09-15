@@ -7,15 +7,15 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
 
   create() {
     const { W, H } = TD.LAYOUT;
-    TD.ART.install(this, TD.FACTIONS);
-    // grass backdrop, darkened
-    for (let y = 0; y < H; y += 45) for (let x = 0; x < W; x += 45) this.add.image(x + 22, y + 22, 'grass' + ((x / 45 + y / 45) % 4)).setScale(0.5).setTint(0x556655);
-    this.add.rectangle(0, 0, W, H, 0x0d110c, 0.55).setOrigin(0);
+    // grass backdrop with a few trees, darkened so the cards read
+    for (let y = 0; y < H; y += 45) for (let x = 0; x < W; x += 45) this.add.image(x + 22, y + 22, ((x + y) / 45) % 5 === 0 ? 'grass_b' : 'grass_a').setScale(45 / 128 * 1.02);
+    for (const [x, y, k, s] of [[40, 60, 'tree_big', 0.6], [500, 120, 'tree_round', 0.7], [70, 900, 'rock_l', 0.5], [480, 880, 'tree_big', 0.6], [510, 500, 'bush', 0.5], [30, 520, 'shrub', 0.5]]) this.add.image(x, y, k).setScale(s);
+    this.add.rectangle(0, 0, W, H, 0x0d110c, 0.62).setOrigin(0);
     this.faction = 'federation';
     this.difficulty = 'normal';
 
-    this.add.text(W / 2, 90, 'Maze Command', {
-      fontFamily: TD.FONT, fontSize: '52px', fontStyle: '700', color: TD.COLOURS.text,
+    this.add.text(W / 2, 90, 'MAZE COMMAND', {
+      fontFamily: TD.FONT, fontSize: '46px', color: TD.COLOURS.text, stroke: '#0d110c', strokeThickness: 6,
     }).setOrigin(0.5);
     this.add.text(W / 2, 140, 'Build the maze. Hold the line. No last wave.', {
       fontFamily: TD.FONT, fontSize: '18px', color: TD.COLOURS.muted,
@@ -33,9 +33,9 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
       const bg = this.add.rectangle(0, 0, cardW, cardH, 0x232b21).setOrigin(0).setStrokeStyle(3, f.colour, 0.35);
       const stripe = this.add.rectangle(0, 0, 10, cardH, f.colour).setOrigin(0);
       const emblem = this.drawEmblem(f, 40, 36);
-      const preview = this.add.image(cardW - 40, 36, 'turret_' + id + '_5').setScale(0.55).setRotation(-0.6);
-      const base = this.add.image(cardW - 40, 36, 'base_' + id).setScale(0.55);
-      const name = this.add.text(70, 22, f.name, { fontFamily: TD.FONT, fontSize: '26px', fontStyle: '700', color: f.colourHex });
+      const base = this.add.image(cardW - 34, cardH - 34, 'plate').setScale(0.36);
+      const preview = this.add.image(cardW - 34, cardH - 34, 'turret_204_' + id).setScale(0.38).setRotation(-0.5);
+      const name = this.add.text(70, 22, f.name.toUpperCase(), { fontFamily: TD.FONT, fontSize: '20px', color: f.colourHex });
       const tag = this.add.text(20, 66, f.tagline, { fontFamily: TD.FONT, fontSize: '14px', color: TD.COLOURS.text, wordWrap: { width: cardW - 40 }, lineSpacing: 2 });
       const best = TD.save.getBest(id);
       const bestTxt = this.add.text(20, cardH - 26, best ? 'Best: wave ' + best : 'Not played yet', { fontFamily: TD.FONT, fontSize: '13px', color: TD.COLOURS.muted });
@@ -62,11 +62,11 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
 
     // Start button
     this.startBg = this.add.rectangle(W / 2, 700, 300, 66, 0x3b78d6).setInteractive({ useHandCursor: true });
-    this.startTxt = this.add.text(W / 2, 700, 'Deploy', { fontFamily: TD.FONT, fontSize: '28px', fontStyle: '700', color: '#ffffff' }).setOrigin(0.5);
+    this.startTxt = this.add.text(W / 2, 700, 'DEPLOY', { fontFamily: TD.FONT, fontSize: '28px', fontStyle: '700', color: '#ffffff' }).setOrigin(0.5);
     this.startBg.on('pointerdown', () => this.scene.start('Game', { faction: this.faction, difficulty: this.difficulty }));
 
-    this.add.text(W / 2, 780, 'How to play', { fontFamily: TD.FONT, fontSize: '18px', fontStyle: '700', color: TD.COLOURS.text }).setOrigin(0.5);
-    this.add.text(W / 2, 845, [
+    this.add.text(W / 2, 770, 'How to play', { fontFamily: TD.FONT, fontSize: '18px', fontStyle: '700', color: TD.COLOURS.text }).setOrigin(0.5);
+    this.add.text(W / 2, 850, [
       'Enemies enter at the top and run for the exit at the bottom.',
       'Tap a square to build. Towers and walls force a longer path.',
       'You can never seal the route completely.',
