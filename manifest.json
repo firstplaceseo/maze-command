@@ -1,0 +1,10 @@
+{
+  "name": "Maze Command",
+  "short_name": "Maze Command",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#151a14",
+  "theme_color": "#151a14",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}
