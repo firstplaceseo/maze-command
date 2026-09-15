@@ -39,6 +39,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     this.countdown = TD.ECON.firstWaveDelay;
     this.speedMult = 1;
     this.towers = [];
+    this.mines = [];
     this.enemies = [];
     this.bullets = [];
     this.effects = [];
@@ -47,7 +48,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     this.currentWave = null;
     this.livesLostThisWave = 0;
     this.lines = TD.factionLines(this.factionId);
-    this.buildMode = 'gunner';   // a line id, or 'wall'
+    this.buildMode = 'gunner';   // a line id, or 'mine'
     this.selected = null;
     this.gameOver = false;
     this.animClock = 0;
@@ -231,14 +232,14 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const L = TD.LAYOUT;
     this.add.rectangle(0, L.BAR_Y, L.W, L.BAR_H, 0x10140f).setOrigin(0).setDepth(9);
     // Row 1: build choices
-    const y1 = L.BAR_Y + 6, h1 = 58, bw = 84, gap = 4;
+    const y1 = L.BAR_Y + 6, h1 = 58, bw = 72, gap = 4;
     this.buildBtns = {};
-    const choices = this.lines.map((ln) => ({ id: ln.id, name: ln.name.toUpperCase(), tex: ln.turrets[0] + '_' + this.factionId })).concat([{ id: 'wall', name: 'WALL', tex: 'rock_l' }]);
+    const choices = this.lines.map((ln) => ({ id: ln.id, name: ln.name.toUpperCase(), tex: ln.turrets[0] + '_' + this.factionId })).concat([{ id: 'mine', name: 'MINES', tex: 'bullet_grey' }]);
     choices.forEach((ch, i) => {
-      const x = 6 + i * (bw + gap);
+      const x = 4 + i * (bw + gap);
       const rect = this.add.rectangle(x, y1, bw, h1, 0x232b21).setOrigin(0).setStrokeStyle(2, 0x3a4536).setInteractive({ useHandCursor: true }).setDepth(9);
-      const plate = ch.id === 'wall' ? null : this.add.image(x + bw / 2, y1 + 22, 'plate').setScale(0.2).setDepth(9);
-      const icon = this.add.image(x + bw / 2, y1 + 22, ch.tex).setScale(ch.id === 'wall' ? 0.22 : 0.24).setDepth(9);
+      const plate = ch.id === 'mine' ? null : this.add.image(x + bw / 2, y1 + 22, 'plate').setScale(0.2).setDepth(9);
+      const icon = this.add.image(x + bw / 2, y1 + 22, ch.tex).setScale(ch.id === 'mine' ? 0.5 : 0.24).setDepth(9);
       const name = this.add.text(x + bw / 2, y1 + 40, ch.name, { fontFamily: TD.FONT, fontSize: '8px', color: TD.COLOURS.text }).setOrigin(0.5, 0).setDepth(9);
       const cost = this.add.text(x + bw / 2, y1 + 50, '', { fontFamily: TD.FONT, fontSize: '9px', color: TD.COLOURS.gold }).setOrigin(0.5, 0).setDepth(9);
       rect.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); TD.SFX.unlock(); this.setBuildMode(ch.id); });
@@ -256,7 +257,9 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     this.updateBar();
   }
 
-  buildCost(id) { return id === 'wall' ? this.faction.wallCost : this.lines.find((l) => l.id === id).tiers[0].cost; }
+  mineDamage() { return TD.MINE.baseDamage + TD.MINE.damagePerWave * Math.max(this.wave, 1); }
+
+  buildCost(id) { return id === 'mine' ? this.faction.mineCost : this.lines.find((l) => l.id === id).tiers[0].cost; }
 
   updateBar() {
     if (!this.buildBtns) return;
@@ -282,8 +285,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   setBuildMode(mode) {
     this.buildMode = mode;
     if (!this.buildBtns) return;
-    if (mode === 'wall') this.hint.setText('Barricade. Blocks the route, no attack. ' + this.faction.wallCost + ' gold.');
-    else { const ln = this.lines.find((l) => l.id === mode); const t0 = ln.tiers[0]; this.hint.setText(ln.name + ': ' + ln.role + ' Dmg ' + t0.damage + ', range ' + t0.range.toFixed(1) + '.'); }
+    if (mode === 'mine') this.hint.setText('Minefield: one-shot trap on any open square, even the route. Does not block. Explodes on the first ground enemy. ' + this.mineDamage() + ' splash damage now.');
+    else { const ln = this.lines.find((l) => l.id === mode); const t0 = ln.tiers[0]; this.hint.setText(ln.name + ': ' + ln.role + (ln.id === 'beacon' ? ' +' + Math.round(t0.buffDmg * 100) + '% damage at tier 1.' : ' Dmg ' + t0.damage + ', range ' + t0.range.toFixed(1) + '.')); }
     this.updateBar();
     this.closePanel();
   }
@@ -313,17 +316,21 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   refreshPanel() {
     const t = this.selected;
     if (!t) return;
-    if (t.type === 'wall') {
-      this.panelTitle.setText('Barricade');
-      this.panelStats.setText('Blocks the route. No attack.\nCheap way to shape the maze.');
-      this.panelUpgrade.rect.setVisible(false); this.panelUpgrade.txt.setVisible(false);
+    if (t.line.id === 'beacon') {
+      const d = t.line.tiers[t.tier - 1];
+      this.panelTitle.setText(d.name + '  (Beacon ' + t.tier + ')');
+      this.panelStats.setText(['Boosts the 8 squares around it. Does not stack.', '+' + Math.round(d.buffDmg * 100) + '% damage' + (d.buffRange ? '   +' + d.buffRange + ' range' : '') + (d.buffRate ? '   +' + Math.round(d.buffRate * 100) + '% fire rate' : ''), t.building > 0 ? 'Under construction' : 'Worth ' + t.value + ' gold'].join('\n'));
+      this.panelUpgrade.rect.setVisible(true); this.panelUpgrade.txt.setVisible(true);
+      const up = this.upgradeInfo(t);
+      this.panelUpgrade.setLabel(up.label.replace(/  \(dmg 0\)/, ''));
+      this.panelUpgrade.txt.setColor(up.affordable && !t.building ? TD.COLOURS.text : TD.COLOURS.muted);
     } else {
       const s = this.towerStats(t);
       const tierDef = t.line.tiers[t.tier - 1];
       this.panelTitle.setText(tierDef.name + '  (' + t.line.name + ' ' + t.tier + (t.overclock ? ', OC ' + t.overclock : '') + ')');
       const hits = t.line.ground && t.line.air ? 'Ground + air' : t.line.air ? 'Air only' : 'Ground only';
       const lines = [
-        'Damage ' + Math.round(s.damage) + '   Range ' + s.range.toFixed(1) + '   Fire ' + (1 / s.cooldown).toFixed(1) + '/s',
+        'Damage ' + Math.round(s.damage) + '   Range ' + s.range.toFixed(1) + '   Fire ' + (1 / s.cooldown).toFixed(1) + '/s' + (s.buffed ? '  (boosted)' : ''),
         hits + (s.splash ? '   Splash ' + s.splash.toFixed(1) : '') + (s.slow ? '   Slow ' + Math.round(s.slow * 100) + '%' : '') + (s.targets > 1 ? '   x' + s.targets + ' targets' : ''),
         t.building > 0 ? 'Under construction' : 'Worth ' + t.value + ' gold',
       ];
@@ -338,9 +345,25 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   // ------------------------------------------------------------- towers
 
+  bestBuff(t) {
+    let best = null;
+    for (const b of this.towers) {
+      if (b.line.id !== 'beacon' || b.building > 0 || b === t) continue;
+      if (Math.abs(b.c - t.c) > 1 || Math.abs(b.r - t.r) > 1) continue;
+      const d = b.line.tiers[b.tier - 1];
+      if (!best || d.buffDmg > best.buffDmg) best = d;
+    }
+    return best;
+  }
+
   towerStats(t) {
     const def = t.line.tiers[t.tier - 1];
-    return { damage: def.damage * (1 + TD.OVERCLOCK_DAMAGE * (t.overclock || 0)), range: def.range, cooldown: def.cooldown, splash: def.splash, slow: def.slow || 0, targets: def.targets || 1, air: t.line.air, ground: t.line.ground };
+    const b = this.bestBuff(t) || { buffDmg: 0, buffRange: 0, buffRate: 0 };
+    return {
+      damage: def.damage * (1 + TD.OVERCLOCK_DAMAGE * (t.overclock || 0)) * (1 + b.buffDmg),
+      range: def.range + b.buffRange, cooldown: def.cooldown / (1 + b.buffRate),
+      splash: def.splash, slow: def.slow || 0, targets: def.targets || 1, air: t.line.air, ground: t.line.ground, buffed: !!this.bestBuff(t),
+    };
   }
 
   upgradeInfo(t) {
@@ -359,7 +382,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   upgradeSelected() {
     const t = this.selected;
-    if (!t || t.type !== 'tower') return;
+    if (!t) return;
     if (t.building > 0) { this.announce('Still under construction', TD.COLOURS.bad); TD.SFX.deny(); return; }
     const up = this.upgradeInfo(t);
     if (!up.affordable) { this.announce(up.needsCore && this.cores === 0 ? 'Needs a Core (awarded every 25 waves)' : 'Not enough gold', TD.COLOURS.bad); TD.SFX.deny(); return; }
@@ -390,15 +413,13 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     t.building = seconds; t.buildTotal = seconds;
     t.site.setVisible(true);
     if (t.turret) t.turret.setVisible(false);
-    if (t.wallImg) t.wallImg.setVisible(false);
     TD.SFX.build();
   }
 
   finishConstruction(t) {
     t.building = 0;
     t.site.setVisible(false);
-    if (t.type === 'tower') { t.turret.setTexture(t.line.turrets[t.tier - 1] + '_' + this.factionId).setScale(TURRET_SCALE[t.tier - 1]).setVisible(true); }
-    else t.wallImg.setVisible(true);
+    t.turret.setTexture(t.line.turrets[t.tier - 1] + '_' + this.factionId).setScale(TURRET_SCALE[t.tier - 1]).setVisible(true);
     TD.SFX.done();
     if (this.selected === t) this.refreshPanel();
   }
@@ -407,7 +428,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const g = this.rangeGfx;
     g.clear();
     const t = this.selected;
-    if (!t || t.type !== 'tower') return;
+    if (!t || t.line.id === 'beacon') { if (t) { const g2 = this.rangeGfx; g2.lineStyle(2, this.faction.colour, 0.7); g2.strokeRect(this.cellX(t.c) - TD.LAYOUT.CELL * 1.5, this.cellY(t.r) - TD.LAYOUT.CELL * 1.5, TD.LAYOUT.CELL * 3, TD.LAYOUT.CELL * 3); } return; }
     const s = this.towerStats(t);
     g.lineStyle(2, this.faction.colour, 0.7);
     g.fillStyle(this.faction.colour, 0.10);
@@ -432,34 +453,39 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   }
 
   tryBuild(c, r) {
-    const isWall = this.buildMode === 'wall';
-    const lineDef = isWall ? null : this.lines.find((l) => l.id === this.buildMode);
-    const cost = this.buildCost(this.buildMode);
     const fail = (m) => { this.announce(m, TD.COLOURS.bad); TD.SFX.deny(); };
+    const cost = this.buildCost(this.buildMode);
     if (this.gold < cost) return fail('Not enough gold');
+    if (this.buildMode === 'mine') {
+      if (!this.grid.isWalkable(c, r)) return fail('Something is already there');
+      if (this.mines.some((m) => m.c === c && m.r === r)) return fail('There is already a mine here');
+      this.gold -= cost;
+      const x = this.cellX(c), y = this.cellY(r);
+      const img = this.add.image(x, y, 'bullet_grey').setScale(0.34).setAlpha(0.95);
+      this.decoLayer.add(img);
+      this.mines.push({ c, r, x, y, img });
+      TD.SFX.build();
+      this.updateHud();
+      return;
+    }
+    const lineDef = this.lines.find((l) => l.id === this.buildMode);
     if (!this.grid.isBuildable(c, r)) return fail('Cannot build on the entry or exit rows');
     if (this.enemyOnCell(c, r)) return fail('An enemy is standing there');
     if (!this.grid.canPlace(c, r)) return fail('That would seal the route');
     this.gold -= cost;
-    this.grid.place(c, r, isWall ? 'wall' : 'tower');
+    this.grid.place(c, r, 'tower');
+    this.mines = this.mines.filter((m) => { if (m.c === c && m.r === r) { m.img.destroy(); this.gold += this.faction.mineCost; return false; } return true; });
     const x = this.cellX(c), y = this.cellY(r);
-    const t = { c, r, type: isWall ? 'wall' : 'tower', line: lineDef, tier: 1, overclock: 0, value: cost, cooldown: 0, building: 0, sprites: [] };
+    const t = { c, r, type: 'tower', line: lineDef, tier: 1, overclock: 0, value: cost, cooldown: 0, building: 0, sprites: [] };
     t.site = this.add.image(x, y, 'site').setScale(TILE).setVisible(false);
-    if (isWall) {
-      t.plate = this.add.image(x, y, 'plate3').setScale(TILE);
-      t.wallImg = this.add.image(x, y - 2, 'rock_l').setScale(0.3);
-      t.sprites.push(t.plate, t.wallImg, t.site);
-      this.towerLayer.add([t.plate, t.wallImg, t.site]);
-    } else {
-      t.base = this.add.image(x, y, 'plate').setScale(TILE);
-      t.turret = this.add.image(x, y, lineDef.turrets[0] + '_' + this.factionId).setScale(TURRET_SCALE[0]);
-      t.flash = this.add.image(x, y, 'flash').setScale(0.25).setVisible(false);
-      t.sprites.push(t.base, t.turret, t.site, t.flash);
-      this.towerLayer.add([t.base, t.turret, t.site]);
-      this.fxLayer.add(t.flash);
-    }
+    t.base = this.add.image(x, y, lineDef.id === 'beacon' ? 'plate_diamond' : 'plate').setScale(TILE);
+    t.turret = this.add.image(x, y, lineDef.turrets[0] + '_' + this.factionId).setScale(TURRET_SCALE[0]);
+    t.flash = this.add.image(x, y, 'flash').setScale(0.25).setVisible(false);
+    t.sprites.push(t.base, t.turret, t.site, t.flash);
+    this.towerLayer.add([t.base, t.turret, t.site]);
+    this.fxLayer.add(t.flash);
     this.towers.push(t);
-    this.startConstruction(t, isWall ? TD.ECON.wallTime : TD.ECON.buildTime);
+    this.startConstruction(t, TD.ECON.buildTime);
     this.onMazeChanged();
     this.updateHud();
   }
@@ -562,6 +588,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
       }
     }
     this.moveEnemies(dt);
+    this.checkMines();
     this.fireTowers(dt);
     this.moveBullets(dt);
     this.updateEffects(dt);
@@ -598,6 +625,26 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     }
   }
 
+  checkMines() {
+    if (!this.mines.length) return;
+    for (const m of this.mines) {
+      if (m.done) continue;
+      for (const e of this.enemies) {
+        if (e.dead || e.flying) continue;
+        if (Math.hypot(e.x - m.x, e.y - m.y) < 14) {
+          m.done = true;
+          const dmg = this.mineDamage(), rad = TD.MINE.splash * TD.LAYOUT.CELL;
+          for (const o of this.enemies) if (!o.dead && !o.flying && Math.hypot(o.x - m.x, o.y - m.y) <= rad) this.hit(o, { damage: dmg, slow: 0 });
+          this.boom(m.x, m.y, 0.8, true);
+          TD.SFX.explode();
+          m.img.destroy();
+          break;
+        }
+      }
+    }
+    this.mines = this.mines.filter((m) => !m.done);
+  }
+
   leak(e) {
     e.dead = true;
     this.destroyEnemySprites(e);
@@ -618,7 +665,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   fireTowers(dt) {
     const L = TD.LAYOUT;
     for (const t of this.towers) {
-      if (t.type !== 'tower' || t.building > 0) continue;
+      if (t.building > 0 || t.line.id === 'beacon') continue;
       t.cooldown -= dt;
       const s = this.towerStats(t);
       const tx = this.cellX(t.c), ty = this.cellY(t.r), rangePx = s.range * L.CELL + L.CELL * 0.4;

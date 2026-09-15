@@ -25,7 +25,7 @@ index.html            loads Phaser and the game files
 manifest.json         makes "Add to Home Screen" work like an app
 icon.png              home screen icon
 js/main.js            screen size, colours, saved best waves, starts Phaser
-js/data/factions.js   the four factions, five tower lines each with 4 tiers (edit to rebalance)
+js/data/factions.js   the four factions, six build lines each (gunner, flak, artillery, sniper, special, beacon) plus mines
 js/data/waves.js      waves 1 to 35, the endless wave generator, economy, difficulty
 js/core/grid.js       the grid and pathfinding (no Phaser, plain logic)
 js/core/sfx.js        synthesised sound effects (no audio files)

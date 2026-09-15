@@ -57,11 +57,24 @@ TD.SHARED_LINES = [
     ]),
 ];
 
+// Support line: no gun. Boosts every tower in the 8 surrounding squares.
+// Boosts don't stack, the best nearby beacon counts.
+TD.BEACON_LINE = line('beacon', 'Beacon', 'No gun. Boosts all towers touching it.', false, false,
+  ['turret_229', 'turret_229', 'turret_229', 'turret_229'], [
+    { name: 'Beacon',        cost: 20,  damage: 0, range: 1.5, cooldown: 1, splash: 0, slow: 0, buffDmg: 0.10, buffRange: 0,   buffRate: 0 },
+    { name: 'Relay Mast',    cost: 60,  damage: 0, range: 1.5, cooldown: 1, splash: 0, slow: 0, buffDmg: 0.20, buffRange: 0.3, buffRate: 0 },
+    { name: 'Uplink',        cost: 150, damage: 0, range: 1.5, cooldown: 1, splash: 0, slow: 0, buffDmg: 0.30, buffRange: 0.5, buffRate: 0.10 },
+    { name: 'Command Post',  cost: 350, damage: 0, range: 1.5, cooldown: 1, splash: 0, slow: 0, buffDmg: 0.40, buffRange: 0.8, buffRate: 0.20 },
+  ]);
+
+// Minefield: a one-shot trap on any open square, including the route.
+TD.MINE = { cost: 8, baseDamage: 30, damagePerWave: 8, splash: 1.0 };
+
 TD.FACTIONS = {
   federation: {
     id: 'federation', name: 'Federation',
     tagline: 'Precision and range. Pays more, shoots further.',
-    colour: 0x3b78d6, colourHex: '#3b78d6', emblem: 'star', wallCost: 6,
+    colour: 0x3b78d6, colourHex: '#3b78d6', emblem: 'star', mineCost: 9,
     mods: { cost: 1.15, damage: 1.0, range: 1.15, cooldown: 1.0, slow: 0 },
     special: line('railgun', 'Railgun', 'Ground and air. One target, enormous damage.', true, true,
       ['turret_206', 'turret_206', 'turret_206', 'turret_206'], [
@@ -74,7 +87,7 @@ TD.FACTIONS = {
   union: {
     id: 'union', name: 'Union',
     tagline: 'Control the field. Every tower slows, the Tesla stops them cold.',
-    colour: 0xe0b83c, colourHex: '#e0b83c', emblem: 'ring', wallCost: 5,
+    colour: 0xe0b83c, colourHex: '#e0b83c', emblem: 'ring', mineCost: 8,
     mods: { cost: 1.0, damage: 0.9, range: 1.0, cooldown: 1.0, slow: 0.15 },
     special: line('tesla', 'Tesla', 'Ground and air. Splash plus a heavy slow.', true, true,
       ['turret_229', 'turret_229', 'turret_205', 'turret_205'], [
@@ -87,7 +100,7 @@ TD.FACTIONS = {
   motherland: {
     id: 'motherland', name: 'Motherland',
     tagline: 'Cheap and brutal. Pack the maze and burn them.',
-    colour: 0xc9302c, colourHex: '#c9302c', emblem: 'bear', wallCost: 3,
+    colour: 0xc9302c, colourHex: '#c9302c', emblem: 'bear', mineCost: 6,
     mods: { cost: 0.85, damage: 1.0, range: 0.95, cooldown: 1.0, slow: 0 },
     special: line('flame', 'Flame', 'Ground only. Short range, huge splash, very cheap.', true, false,
       ['turret_227', 'turret_227', 'turret_228', 'turret_228'], [
@@ -100,7 +113,7 @@ TD.FACTIONS = {
   dynasty: {
     id: 'dynasty', name: 'Dynasty',
     tagline: 'Numbers win. Faster fire, lighter hits, swarms of rockets.',
-    colour: 0xd8462e, colourHex: '#d8462e', emblem: 'dragon', wallCost: 4,
+    colour: 0xd8462e, colourHex: '#d8462e', emblem: 'dragon', mineCost: 8,
     mods: { cost: 1.0, damage: 0.85, range: 1.0, cooldown: 0.8, slow: 0 },
     special: line('swarm', 'Swarm', 'Ground and air. Fires at three targets at once.', true, true,
       ['turret_204', 'turret_205', 'turret_205', 'turret_205'], [
@@ -128,7 +141,7 @@ TD.factionLines = function (factionId) {
       slow: Math.min(0.8, (t.slow || 0) + m.slow),
     })),
   });
-  f._lines = TD.SHARED_LINES.map(apply).concat([Object.assign({}, f.special, { special: true })]);
+  f._lines = TD.SHARED_LINES.map(apply).concat([Object.assign({}, f.special, { special: true }), Object.assign({}, TD.BEACON_LINE, { tiers: TD.BEACON_LINE.tiers.map((x) => Object.assign({}, x, { cost: Math.round(x.cost * m.cost) })) })]);
   return f._lines;
 };
 

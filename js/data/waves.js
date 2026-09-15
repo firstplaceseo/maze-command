@@ -66,7 +66,6 @@ TD.ECON = {
   waveGap: 12,           // seconds between waves (player can start early)
   perfectBonus: 5,       // extra gold for a wave with no lives lost
   buildTime: 3,          // seconds to construct a new tower
-  wallTime: 1.2,         // seconds to build a wall
   upgradeTime: 2.5,      // seconds for a tier upgrade
 };
 

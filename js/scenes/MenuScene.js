@@ -68,9 +68,10 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
     this.add.text(W / 2, 770, 'How to play', { fontFamily: TD.FONT, fontSize: '18px', fontStyle: '700', color: TD.COLOURS.text }).setOrigin(0.5);
     this.add.text(W / 2, 850, [
       'Enemies enter at the top and run for the exit at the bottom.',
-      'Tap a square to build. Towers and walls force a longer path.',
+      'Tap a square to build. Towers force a longer path.',
       'You can never seal the route completely.',
-      'Five tower types per faction: gunner, flak, artillery, sniper, special.',
+      'Six builds per faction: gunner, flak, artillery, sniper, special, beacon.',
+      'Mines go on any open square, even the route, and blow up the first enemy.',
       'Towers take a few seconds to build. Tap one to upgrade or sell it.',
       'Every 5th wave is a boss. Waves ending in 3 or 8 fly over the maze.',
       'Waves never stop. Reach the highest wave you can.',
