@@ -15,7 +15,7 @@
 //   slow      0..1 fraction of speed removed for 2 seconds on hit (0 = none)
 //   air       true if the tower can hit flying enemies
 //   core      true if this tier needs the Core resource
-// Stats are tuned for a single player on a 12 x 18 grid.
+// Stats were derived from the System TD Warcraft III map, scaled for one player.
 
 window.TD = window.TD || {};
 

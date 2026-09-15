@@ -7,6 +7,10 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
 
   create() {
     const { W, H } = TD.LAYOUT;
+    TD.ART.install(this, TD.FACTIONS);
+    // grass backdrop, darkened
+    for (let y = 0; y < H; y += 45) for (let x = 0; x < W; x += 45) this.add.image(x + 22, y + 22, 'grass' + ((x / 45 + y / 45) % 4)).setScale(0.5).setTint(0x556655);
+    this.add.rectangle(0, 0, W, H, 0x0d110c, 0.55).setOrigin(0);
     this.faction = 'federation';
     this.difficulty = 'normal';
 
@@ -29,11 +33,13 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
       const bg = this.add.rectangle(0, 0, cardW, cardH, 0x232b21).setOrigin(0).setStrokeStyle(3, f.colour, 0.35);
       const stripe = this.add.rectangle(0, 0, 10, cardH, f.colour).setOrigin(0);
       const emblem = this.drawEmblem(f, 40, 36);
+      const preview = this.add.image(cardW - 40, 36, 'turret_' + id + '_5').setScale(0.55).setRotation(-0.6);
+      const base = this.add.image(cardW - 40, 36, 'base_' + id).setScale(0.55);
       const name = this.add.text(70, 22, f.name, { fontFamily: TD.FONT, fontSize: '26px', fontStyle: '700', color: f.colourHex });
       const tag = this.add.text(20, 66, f.tagline, { fontFamily: TD.FONT, fontSize: '14px', color: TD.COLOURS.text, wordWrap: { width: cardW - 40 }, lineSpacing: 2 });
       const best = TD.save.getBest(id);
       const bestTxt = this.add.text(20, cardH - 26, best ? 'Best: wave ' + best : 'Not played yet', { fontFamily: TD.FONT, fontSize: '13px', color: TD.COLOURS.muted });
-      card.add([bg, stripe, emblem, name, tag, bestTxt]);
+      card.add([bg, stripe, emblem, base, preview, name, tag, bestTxt]);
       bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.selectFaction(id));
       this.cards[id] = { bg, f };
     });
@@ -64,7 +70,8 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
       'Enemies enter at the top and run for the exit at the bottom.',
       'Tap a square to build. Towers and walls force a longer path.',
       'You can never seal the route completely.',
-      'Tap a tower to upgrade or sell it. Every 5th wave flies over the maze.',
+      'Towers take a few seconds to build. Tap one to upgrade or sell it.',
+      'Every 5th wave is a boss. Waves ending in 3 or 8 fly over the maze.',
       'Waves never stop. Reach the highest wave you can.',
     ].join('\n'), { fontFamily: TD.FONT, fontSize: '14px', color: TD.COLOURS.muted, align: 'center', lineSpacing: 4 }).setOrigin(0.5);
 

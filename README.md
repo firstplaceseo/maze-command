@@ -28,17 +28,22 @@ js/main.js            screen size, colours, saved best waves, starts Phaser
 js/data/factions.js   the four factions and their 7 tower tiers (edit to rebalance)
 js/data/waves.js      waves 1 to 35, the endless wave generator, economy, difficulty
 js/core/grid.js       the grid and pathfinding (no Phaser, plain logic)
+js/core/sfx.js        synthesised sound effects (no audio files)
+js/art/sprites.js     every sprite, drawn in code at load time (no image files)
 js/scenes/MenuScene.js   faction and difficulty picker
 js/scenes/GameScene.js   the game itself
+docs/                 the data extracted from the original System TD map
 ```
 
 Balance lives in the two data files. You do not need to touch the scenes to change costs, damage, wave sizes or how fast endless mode ramps up.
 
 ## How endless mode stays fair
 
-Waves 1 to 35 are hand made. After that, waves are generated: hp grows 7% per wave, armour rises slowly, count varies, every 5th wave flies, every 10th is a boss. A check compares each generated wave's "toughness per gold the player could have earned" with the hardest hand made wave. If a wave would be tougher than that, its hp is scaled down. So the difficulty keeps rising with your income rather than running away from it. Towers past tier 7 can be overclocked forever, so there is always something to buy.
+Waves 1 to 35 are hand made (converted from the System TD map). After that, waves are generated: hp grows 7% per wave, armour rises slowly, count varies, every 5th wave flies, every 10th is a boss. A check compares each generated wave's "toughness per gold the player could have earned" with the hardest hand made wave. If a wave would be tougher than that, its hp is scaled down. So the difficulty keeps rising with your income rather than running away from it. Towers past tier 7 can be overclocked forever, so there is always something to buy.
 
 ## Roadmap ideas
+
+- Second tower line per faction (support and specialist towers)
 
 - Sound and music
 - More than one tower line per faction (support towers, walls with abilities)
