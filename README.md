@@ -25,7 +25,7 @@ index.html            loads Phaser and the game files
 manifest.json         makes "Add to Home Screen" work like an app
 icon.png              home screen icon
 js/main.js            screen size, colours, saved best waves, starts Phaser
-js/data/factions.js   the four factions and their 7 tower tiers (edit to rebalance)
+js/data/factions.js   the four factions, five tower lines each with 4 tiers (edit to rebalance)
 js/data/waves.js      waves 1 to 35, the endless wave generator, economy, difficulty
 js/core/grid.js       the grid and pathfinding (no Phaser, plain logic)
 js/core/sfx.js        synthesised sound effects (no audio files)
@@ -40,7 +40,7 @@ Balance lives in the two data files. You do not need to touch the scenes to chan
 
 ## How endless mode stays fair
 
-Waves 1 to 35 are hand made (converted from the System TD map). After that, waves are generated: hp grows 7% per wave, armour rises slowly, count varies, every 5th wave flies, every 10th is a boss. A check compares each generated wave's "toughness per gold the player could have earned" with the hardest hand made wave. If a wave would be tougher than that, its hp is scaled down. So the difficulty keeps rising with your income rather than running away from it. Towers past tier 7 can be overclocked forever, so there is always something to buy.
+Waves 1 to 35 are hand made (converted from the System TD map). After that, waves are generated: hp grows 7% per wave, armour rises slowly, count varies, every 5th wave flies, every 10th is a boss. A check compares each generated wave's "toughness per gold the player could have earned" with the hardest hand made wave. If a wave would be tougher than that, its hp is scaled down. So the difficulty keeps rising with your income rather than running away from it. Towers past their last tier can be overclocked forever, so there is always something to buy.
 
 ## Credits
 
@@ -48,7 +48,6 @@ Art: Kenney (kenney.nl), "Tower Defense (top-down)", Game Icons, Board Game Icon
 
 ## Roadmap ideas
 
-- Second tower line per faction (support and specialist towers)
 
 - Sound and music
 - More than one tower line per faction (support towers, walls with abilities)

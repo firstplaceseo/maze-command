@@ -34,7 +34,7 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
       const stripe = this.add.rectangle(0, 0, 10, cardH, f.colour).setOrigin(0);
       const emblem = this.drawEmblem(f, 40, 36);
       const base = this.add.image(cardW - 34, cardH - 34, 'plate').setScale(0.36);
-      const preview = this.add.image(cardW - 34, cardH - 34, 'turret_204_' + id).setScale(0.38).setRotation(-0.5);
+      const preview = this.add.image(cardW - 34, cardH - 34, TD.factionLines(id)[4].turrets[3] + '_' + id).setScale(0.38).setRotation(-0.5);
       const name = this.add.text(70, 22, f.name.toUpperCase(), { fontFamily: TD.FONT, fontSize: '20px', color: f.colourHex });
       const tag = this.add.text(20, 66, f.tagline, { fontFamily: TD.FONT, fontSize: '14px', color: TD.COLOURS.text, wordWrap: { width: cardW - 40 }, lineSpacing: 2 });
       const best = TD.save.getBest(id);
@@ -70,6 +70,7 @@ TD.MenuScene = class MenuScene extends Phaser.Scene {
       'Enemies enter at the top and run for the exit at the bottom.',
       'Tap a square to build. Towers and walls force a longer path.',
       'You can never seal the route completely.',
+      'Five tower types per faction: gunner, flak, artillery, sniper, special.',
       'Towers take a few seconds to build. Tap one to upgrade or sell it.',
       'Every 5th wave is a boss. Waves ending in 3 or 8 fly over the maze.',
       'Waves never stop. Reach the highest wave you can.',

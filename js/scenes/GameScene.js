@@ -15,8 +15,7 @@ const KIND = {
   boss:  { body: 'e_boss', gun: 'e_boss_gun', face: 'right', scale: 0.62, radius: 20 },
 };
 const TILE = 45 / 128;               // art is 128px, a cell is 45px
-const TURRET_TEX = ['turret_226', 'turret_227', 'turret_203', 'turret_228', 'turret_204', 'turret_205', 'turret_206'];
-const TURRET_SCALE = [0.34, 0.36, 0.36, 0.38, 0.38, 0.40, 0.42];
+const TURRET_SCALE = [0.34, 0.37, 0.40, 0.43];
 
 TD.GameScene = class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
@@ -47,7 +46,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     this.spawnTimer = 0;
     this.currentWave = null;
     this.livesLostThisWave = 0;
-    this.buildMode = 'tower';
+    this.lines = TD.factionLines(this.factionId);
+    this.buildMode = 'gunner';   // a line id, or 'wall'
     this.selected = null;
     this.gameOver = false;
     this.animClock = 0;
@@ -230,29 +230,45 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   buildBar() {
     const L = TD.LAYOUT;
     this.add.rectangle(0, L.BAR_Y, L.W, L.BAR_H, 0x10140f).setOrigin(0).setDepth(9);
-    const y = L.BAR_Y + 10, h = L.BAR_H - 20;
-    this.btnTower = this.makeButton(10, y, 118, h, '', () => this.setBuildMode('tower'));
-    this.btnWall = this.makeButton(134, y, 96, h, '', () => this.setBuildMode('wall'));
-    this.btnStart = this.makeButton(236, y, 176, h, '', () => this.startWaveNow(), 9, 'next');
-    this.btnSpeed = this.makeButton(418, y, 54, h, '', () => this.toggleSpeed(), 9, 'fastForward');
-    this.btnSound = this.makeButton(478, y, 52, h, '', () => { const m = TD.SFX.toggle(); this.btnSound.img.setTexture(m ? 'ui_audioOff' : 'ui_audioOn'); }, 9, 'audioOn');
-    this.btnSpeed.img.setPosition(445, y + h / 2); this.btnSpeed.txt.setPosition(445, y + h - 12).setOrigin(0.5).setFontSize(11);
-    this.btnSound.img.setPosition(504, y + h / 2);
-    // little previews on the build buttons
-    this.add.image(32, y + h / 2, 'plate').setScale(0.22).setDepth(9);
-    this.add.image(32, y + h / 2, TURRET_TEX[0] + '_' + this.factionId).setScale(0.24).setDepth(9);
-    this.add.image(156, y + h / 2, 'rock_l').setScale(0.24).setDepth(9);
-    this.setBuildMode('tower');
+    // Row 1: build choices
+    const y1 = L.BAR_Y + 6, h1 = 58, bw = 84, gap = 4;
+    this.buildBtns = {};
+    const choices = this.lines.map((ln) => ({ id: ln.id, name: ln.name.toUpperCase(), tex: ln.turrets[0] + '_' + this.factionId })).concat([{ id: 'wall', name: 'WALL', tex: 'rock_l' }]);
+    choices.forEach((ch, i) => {
+      const x = 6 + i * (bw + gap);
+      const rect = this.add.rectangle(x, y1, bw, h1, 0x232b21).setOrigin(0).setStrokeStyle(2, 0x3a4536).setInteractive({ useHandCursor: true }).setDepth(9);
+      const plate = ch.id === 'wall' ? null : this.add.image(x + bw / 2, y1 + 22, 'plate').setScale(0.2).setDepth(9);
+      const icon = this.add.image(x + bw / 2, y1 + 22, ch.tex).setScale(ch.id === 'wall' ? 0.22 : 0.24).setDepth(9);
+      const name = this.add.text(x + bw / 2, y1 + 40, ch.name, { fontFamily: TD.FONT, fontSize: '8px', color: TD.COLOURS.text }).setOrigin(0.5, 0).setDepth(9);
+      const cost = this.add.text(x + bw / 2, y1 + 50, '', { fontFamily: TD.FONT, fontSize: '9px', color: TD.COLOURS.gold }).setOrigin(0.5, 0).setDepth(9);
+      rect.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); TD.SFX.unlock(); this.setBuildMode(ch.id); });
+      this.buildBtns[ch.id] = { rect, icon, plate, name, cost };
+    });
+    // Row 2: hint, send wave, speed, sound
+    const y2 = L.BAR_Y + 70, h2 = 48;
+    this.hint = this.add.text(8, y2 + 2, '', { fontFamily: TD.FONT, fontSize: '10px', color: TD.COLOURS.muted, wordWrap: { width: 236 }, lineSpacing: 2 }).setDepth(9);
+    this.btnStart = this.makeButton(250, y2, 166, h2, '', () => this.startWaveNow(), 9, 'next');
+    this.btnSpeed = this.makeButton(422, y2, 54, h2, '', () => this.toggleSpeed(), 9, 'fastForward');
+    this.btnSound = this.makeButton(480, y2, 52, h2, '', () => { const m = TD.SFX.toggle(); this.btnSound.img.setTexture(m ? 'ui_audioOff' : 'ui_audioOn'); }, 9, 'audioOn');
+    this.btnSpeed.img.setPosition(449, y2 + 18); this.btnSpeed.txt.setPosition(449, y2 + 38).setOrigin(0.5).setFontSize(10);
+    this.btnSound.img.setPosition(506, y2 + h2 / 2);
+    this.setBuildMode('gunner');
     this.updateBar();
   }
 
+  buildCost(id) { return id === 'wall' ? this.faction.wallCost : this.lines.find((l) => l.id === id).tiers[0].cost; }
+
   updateBar() {
-    if (!this.btnTower) return;
-    const tierCost = this.faction.tiers[0].cost;
-    this.btnTower.setLabel('TOWER\n' + tierCost + ' gold').setPosition(84, this.btnTower.rect.y + this.btnTower.rect.height / 2);
-    this.btnWall.setLabel('WALL\n' + this.faction.wallCost + ' gold').setPosition(194, this.btnWall.rect.y + this.btnWall.rect.height / 2);
-    this.btnTower.txt.setColor(this.gold >= tierCost ? TD.COLOURS.text : TD.COLOURS.muted);
-    this.btnWall.txt.setColor(this.gold >= this.faction.wallCost ? TD.COLOURS.text : TD.COLOURS.muted);
+    if (!this.buildBtns) return;
+    for (const id in this.buildBtns) {
+      const b = this.buildBtns[id], cost = this.buildCost(id);
+      b.cost.setText(cost + 'g');
+      const ok = this.gold >= cost;
+      b.name.setColor(ok ? TD.COLOURS.text : TD.COLOURS.muted);
+      b.icon.setAlpha(ok ? 1 : 0.45);
+      b.rect.setStrokeStyle(2, id === this.buildMode ? this.faction.colour : 0x3a4536);
+      b.rect.setFillStyle(id === this.buildMode ? 0x2b362a : 0x232b21);
+    }
     if (this.phase === 'build') {
       this.btnStart.setLabel('SEND WAVE ' + (this.wave + 1) + '\nor wait ' + Math.ceil(this.countdown) + 's');
       this.btnStart.rect.setFillStyle(0x2f4a2c);
@@ -265,9 +281,10 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   setBuildMode(mode) {
     this.buildMode = mode;
-    if (!this.btnTower) return;
-    this.btnTower.rect.setStrokeStyle(2, mode === 'tower' ? this.faction.colour : 0x3a4536);
-    this.btnWall.rect.setStrokeStyle(2, mode === 'wall' ? this.faction.colour : 0x3a4536);
+    if (!this.buildBtns) return;
+    if (mode === 'wall') this.hint.setText('Barricade. Blocks the route, no attack. ' + this.faction.wallCost + ' gold.');
+    else { const ln = this.lines.find((l) => l.id === mode); const t0 = ln.tiers[0]; this.hint.setText(ln.name + ': ' + ln.role + ' Dmg ' + t0.damage + ', range ' + t0.range.toFixed(1) + '.'); }
+    this.updateBar();
     this.closePanel();
   }
 
@@ -302,11 +319,12 @@ TD.GameScene = class GameScene extends Phaser.Scene {
       this.panelUpgrade.rect.setVisible(false); this.panelUpgrade.txt.setVisible(false);
     } else {
       const s = this.towerStats(t);
-      const tierDef = this.faction.tiers[t.tier - 1];
-      this.panelTitle.setText(tierDef.name + '  (tier ' + t.tier + (t.overclock ? ', overclock ' + t.overclock : '') + ')');
+      const tierDef = t.line.tiers[t.tier - 1];
+      this.panelTitle.setText(tierDef.name + '  (' + t.line.name + ' ' + t.tier + (t.overclock ? ', OC ' + t.overclock : '') + ')');
+      const hits = t.line.ground && t.line.air ? 'Ground + air' : t.line.air ? 'Air only' : 'Ground only';
       const lines = [
         'Damage ' + Math.round(s.damage) + '   Range ' + s.range.toFixed(1) + '   Fire ' + (1 / s.cooldown).toFixed(1) + '/s',
-        (s.splash ? 'Splash ' + s.splash.toFixed(1) + '   ' : '') + (s.slow ? 'Slows ' + Math.round(s.slow * 100) + '%   ' : '') + (s.air ? 'Hits air' : 'Ground only'),
+        hits + (s.splash ? '   Splash ' + s.splash.toFixed(1) : '') + (s.slow ? '   Slow ' + Math.round(s.slow * 100) + '%' : '') + (s.targets > 1 ? '   x' + s.targets + ' targets' : ''),
         t.building > 0 ? 'Under construction' : 'Worth ' + t.value + ' gold',
       ];
       this.panelStats.setText(lines.join('\n'));
@@ -321,18 +339,18 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------- towers
 
   towerStats(t) {
-    const def = this.faction.tiers[t.tier - 1];
-    return { damage: def.damage * (1 + TD.OVERCLOCK_DAMAGE * (t.overclock || 0)), range: def.range, cooldown: def.cooldown, splash: def.splash, slow: def.slow, air: def.air };
+    const def = t.line.tiers[t.tier - 1];
+    return { damage: def.damage * (1 + TD.OVERCLOCK_DAMAGE * (t.overclock || 0)), range: def.range, cooldown: def.cooldown, splash: def.splash, slow: def.slow || 0, targets: def.targets || 1, air: t.line.air, ground: t.line.ground };
   }
 
   upgradeInfo(t) {
-    const tiers = this.faction.tiers;
+    const tiers = t.line.tiers;
     if (t.tier < tiers.length) {
       const next = tiers[t.tier];
       const cost = next.cost - tiers[t.tier - 1].cost;
       const needsCore = !!next.core;
       const affordable = this.gold >= cost && (!needsCore || this.cores > 0);
-      return { kind: 'tier', cost, needsCore, affordable, label: 'Upgrade: ' + next.name + '\n' + cost + ' gold' + (needsCore ? ' + 1 Core' : '') };
+      return { kind: 'tier', cost, needsCore, affordable, label: 'UPGRADE: ' + next.name + '\n' + cost + ' gold' + (needsCore ? ' + 1 Core' : '') + '  (dmg ' + next.damage + ')' };
     }
     const lvl = (t.overclock || 0) + 1;
     const cost = Math.round(TD.OVERCLOCK_BASE * Math.pow(TD.OVERCLOCK_GROWTH, lvl - 1));
@@ -379,7 +397,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   finishConstruction(t) {
     t.building = 0;
     t.site.setVisible(false);
-    if (t.type === 'tower') { t.turret.setTexture(TURRET_TEX[t.tier - 1] + '_' + this.factionId).setScale(TURRET_SCALE[t.tier - 1]).setVisible(true); }
+    if (t.type === 'tower') { t.turret.setTexture(t.line.turrets[t.tier - 1] + '_' + this.factionId).setScale(TURRET_SCALE[t.tier - 1]).setVisible(true); }
     else t.wallImg.setVisible(true);
     TD.SFX.done();
     if (this.selected === t) this.refreshPanel();
@@ -415,7 +433,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
 
   tryBuild(c, r) {
     const isWall = this.buildMode === 'wall';
-    const cost = isWall ? this.faction.wallCost : this.faction.tiers[0].cost;
+    const lineDef = isWall ? null : this.lines.find((l) => l.id === this.buildMode);
+    const cost = this.buildCost(this.buildMode);
     const fail = (m) => { this.announce(m, TD.COLOURS.bad); TD.SFX.deny(); };
     if (this.gold < cost) return fail('Not enough gold');
     if (!this.grid.isBuildable(c, r)) return fail('Cannot build on the entry or exit rows');
@@ -424,7 +443,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     this.gold -= cost;
     this.grid.place(c, r, isWall ? 'wall' : 'tower');
     const x = this.cellX(c), y = this.cellY(r);
-    const t = { c, r, type: isWall ? 'wall' : 'tower', tier: 1, overclock: 0, value: cost, cooldown: 0, building: 0, sprites: [] };
+    const t = { c, r, type: isWall ? 'wall' : 'tower', line: lineDef, tier: 1, overclock: 0, value: cost, cooldown: 0, building: 0, sprites: [] };
     t.site = this.add.image(x, y, 'site').setScale(TILE).setVisible(false);
     if (isWall) {
       t.plate = this.add.image(x, y, 'plate3').setScale(TILE);
@@ -433,7 +452,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
       this.towerLayer.add([t.plate, t.wallImg, t.site]);
     } else {
       t.base = this.add.image(x, y, 'plate').setScale(TILE);
-      t.turret = this.add.image(x, y, TURRET_TEX[0] + '_' + this.factionId).setScale(TURRET_SCALE[0]);
+      t.turret = this.add.image(x, y, lineDef.turrets[0] + '_' + this.factionId).setScale(TURRET_SCALE[0]);
       t.flash = this.add.image(x, y, 'flash').setScale(0.25).setVisible(false);
       t.sprites.push(t.base, t.turret, t.site, t.flash);
       this.towerLayer.add([t.base, t.turret, t.site]);
@@ -603,24 +622,29 @@ TD.GameScene = class GameScene extends Phaser.Scene {
       t.cooldown -= dt;
       const s = this.towerStats(t);
       const tx = this.cellX(t.c), ty = this.cellY(t.r), rangePx = s.range * L.CELL + L.CELL * 0.4;
-      let best = null, bestU = -Infinity;
+      const inRange = [];
       for (const e of this.enemies) {
-        if (e.dead || (e.flying && !s.air)) continue;
+        if (e.dead || (e.flying && !s.air) || (!e.flying && !s.ground)) continue;
         if (Math.hypot(e.x - tx, e.y - ty) > rangePx) continue;
-        const u = this.urgency(e);
-        if (u > bestU) { bestU = u; best = e; }
+        inRange.push(e);
       }
-      if (!best) continue;
+      if (!inRange.length) continue;
+      inRange.sort((a, b) => this.urgency(b) - this.urgency(a));
+      const best = inRange[0];
       const ang = Math.atan2(best.y - ty, best.x - tx);
       t.turret.setRotation(ang + Math.PI / 2);
       if (t.cooldown > 0) continue;
       t.cooldown = s.cooldown;
-      const tex = t.tier >= 5 ? 'missile_s' : t.tier === 3 ? 'bullet_orange' : 'bullet_small';
-      const bx = tx + Math.cos(ang) * 16, by = ty + Math.sin(ang) * 16;
-      const img = this.add.image(bx, by, tex).setScale(t.tier >= 5 ? 0.3 : 0.22).setRotation(ang + Math.PI / 2);
-      this.bulletLayer.add(img);
-      this.bullets.push({ x: bx, y: by, target: best, damage: s.damage, splash: s.splash, slow: s.slow, speed: 13 * L.CELL, img });
-      t.flash.setPosition(bx, by).setRotation(ang).setVisible(true).setAlpha(1);
+      const tex = t.line.id === 'flak' || t.line.id === 'swarm' ? 'missile_s' : t.line.id === 'artillery' ? 'bullet_orange' : t.line.id === 'sniper' || t.line.id === 'railgun' ? 'bullet_grey' : t.line.id === 'tesla' ? 'bullet_small' : 'bullet_small';
+      const targets = inRange.slice(0, s.targets);
+      for (const tgt of targets) {
+        const a = Math.atan2(tgt.y - ty, tgt.x - tx);
+        const bx = tx + Math.cos(a) * 16, by = ty + Math.sin(a) * 16;
+        const img = this.add.image(bx, by, tex).setScale(t.line.id === 'railgun' ? 0.3 : 0.24).setRotation(a + Math.PI / 2);
+        this.bulletLayer.add(img);
+        this.bullets.push({ x: bx, y: by, target: tgt, damage: s.damage, splash: s.splash, slow: s.slow, speed: (t.line.id === 'artillery' ? 8 : 14) * L.CELL, img, flame: t.line.id === 'flame' });
+      }
+      t.flash.setPosition(tx + Math.cos(ang) * 16, ty + Math.sin(ang) * 16).setRotation(ang).setVisible(true).setAlpha(1);
       t.flashUntil = this.animClock + 0.06;
       TD.SFX.shoot(t.tier);
     }

@@ -56,6 +56,7 @@ TD.buildTintedTextures = function (scene) {
     const col = (lift((c >> 16) & 255) << 16) | (lift((c >> 8) & 255) << 8) | lift(c & 255);
     for (const k of ['turret_226', 'turret_227', 'turret_203', 'turret_228', 'turret_204', 'turret_205', 'turret_206', 'turret_229']) TD.tintTexture(scene, k, col, k + '_' + id);
     TD.tintTexture(scene, 'ui_flag', col, 'flag_' + id);
+    TD.factionLines(id); // warm the cache
   }
   TD.tintTexture(scene, 'wrench_frame', 0xf2c94c, 'site');
   TD.tintTexture(scene, 'grass', 0xd6e8cc, 'grass_a');
