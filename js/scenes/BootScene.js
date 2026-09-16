@@ -49,14 +49,24 @@ TD.tintTexture = function (scene, srcKey, colour, newKey) {
 };
 
 TD.buildTintedTextures = function (scene) {
+  const lift = (v, k) => Math.round(v + (255 - v) * k);
+  const lighten = (c, k) => (lift((c >> 16) & 255, k) << 16) | (lift((c >> 8) & 255, k) << 8) | lift(c & 255, k);
+  const turretKeys = ['turret_226', 'turret_227', 'turret_203', 'turret_228', 'turret_204', 'turret_205', 'turret_206', 'turret_229'];
   for (const id in TD.FACTIONS) {
-    // lighten the faction colour so the turret shading survives the multiply
     const c = TD.FACTIONS[id].colour;
-    const lift = (v) => Math.round(v + (255 - v) * 0.4);
-    const col = (lift((c >> 16) & 255) << 16) | (lift((c >> 8) & 255) << 8) | lift(c & 255);
-    for (const k of ['turret_226', 'turret_227', 'turret_203', 'turret_228', 'turret_204', 'turret_205', 'turret_206', 'turret_229']) TD.tintTexture(scene, k, col, k + '_' + id);
-    TD.tintTexture(scene, 'ui_flag', col, 'flag_' + id);
-    TD.factionLines(id); // warm the cache
+    // faction colour on the base plates and flag
+    TD.tintTexture(scene, 'plate', lighten(c, 0.35), 'plate_' + id);
+    TD.tintTexture(scene, 'plate_diamond', lighten(c, 0.35), 'plate_diamond_' + id);
+    TD.tintTexture(scene, 'ui_flag', lighten(c, 0.4), 'flag_' + id);
+    // the special line uses the faction colour on its turret
+    for (const k of turretKeys) TD.tintTexture(scene, k, lighten(c, 0.4), k + '_' + id);
+    TD.factionLines(id);
+  }
+  // shared lines get their own turret colours
+  for (const ln in TD.LINE_COLOURS) {
+    const col = TD.LINE_COLOURS[ln];
+    if (!col) continue;
+    for (const k of turretKeys) TD.tintTexture(scene, k, col, k + '_' + ln);
   }
   TD.tintTexture(scene, 'wrench_frame', 0xf2c94c, 'site');
   TD.tintTexture(scene, 'grass', 0xd6e8cc, 'grass_a');

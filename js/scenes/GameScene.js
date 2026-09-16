@@ -15,7 +15,9 @@ const KIND = {
   boss:  { body: 'e_boss', gun: 'e_boss_gun', face: 'right', scale: 0.62, radius: 20 },
 };
 const TILE = 45 / 128;               // art is 128px, a cell is 45px
-const TURRET_SCALE = [0.34, 0.37, 0.40, 0.43];
+const TURRET_SCALE = [0.44, 0.47, 0.50, 0.54];
+// texture suffix for a line's turret: its own colour, or the faction colour for the special
+const turretKey = (scene, ln, tier) => ln.turrets[tier - 1] + '_' + (TD.LINE_COLOURS[ln.id] ? ln.id : scene.factionId);
 
 TD.GameScene = class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
@@ -116,8 +118,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     }
     // HQ: two plates, a big turret and the faction flag
     const hx = this.cellX(e.c) + L.CELL / 2, hy = this.cellY(e.r);
-    this.decoLayer.add(this.add.image(this.cellX(e.c), hy, 'plate').setScale(TILE));
-    this.decoLayer.add(this.add.image(this.cellX(e.c + 1), hy, 'plate').setScale(TILE));
+    this.decoLayer.add(this.add.image(this.cellX(e.c), hy, 'plate_' + this.factionId).setScale(TILE));
+    this.decoLayer.add(this.add.image(this.cellX(e.c + 1), hy, 'plate_' + this.factionId).setScale(TILE));
     this.decoLayer.add(this.add.image(hx, hy + 2, 'turret_229_' + this.factionId).setScale(0.5).setAngle(180));
     this.decoLayer.add(this.add.image(hx + 26, hy - 14, 'flag_' + this.factionId).setScale(0.22));
     // scattered detail in the field (towers build over it)
@@ -183,15 +185,15 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const L = TD.LAYOUT, C = TD.COLOURS;
     this.add.rectangle(0, 0, L.W, L.HUD_H, 0x10140f).setOrigin(0).setDepth(9);
     this.add.rectangle(0, 0, 8, L.HUD_H, this.faction.colour).setOrigin(0).setDepth(9);
-    this.add.image(30, 22, 'flag_' + this.factionId).setScale(0.2).setDepth(9);
-    this.hudFaction = this.add.text(48, 10, this.faction.name, { fontFamily: TD.FONT, fontSize: '18px', color: this.faction.colourHex }).setDepth(9);
-    this.hudWave = this.add.text(48, 36, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.text }).setDepth(9);
-    this.add.image(L.W - 118, 22, 'coin').setScale(0.24).setDepth(9);
-    this.hudGold = this.add.text(L.W - 100, 10, '', { fontFamily: TD.FONT, fontSize: '22px', color: C.gold }).setOrigin(0, 0).setDepth(9);
-    this.add.image(L.W - 118, 50, 'ui_shield').setScale(0.16).setDepth(9);
-    this.hudLives = this.add.text(L.W - 100, 40, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.text }).setOrigin(0, 0).setDepth(9);
-    this.hudWaveName = this.add.text(L.W / 2, 10, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.muted }).setOrigin(0.5, 0).setDepth(9);
-    this.hudCore = this.add.text(L.W / 2, 38, '', { fontFamily: TD.FONT, fontSize: '13px', color: '#ffd166' }).setOrigin(0.5, 0).setDepth(9);
+    this.add.image(28, 20, 'flag_' + this.factionId).setScale(0.18).setDepth(9);
+    this.hudFaction = this.add.text(46, 8, this.faction.name, { fontFamily: TD.FONT, fontSize: '18px', color: this.faction.colourHex }).setDepth(9);
+    this.hudWave = this.add.text(46, 34, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.text }).setDepth(9);
+    this.add.image(L.W - 118, 20, 'coin').setScale(0.24).setDepth(9);
+    this.hudGold = this.add.text(L.W - 100, 8, '', { fontFamily: TD.FONT, fontSize: '22px', color: C.gold }).setOrigin(0, 0).setDepth(9);
+    this.add.image(L.W - 118, 46, 'ui_shield').setScale(0.16).setDepth(9);
+    this.hudLives = this.add.text(L.W - 100, 36, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.text }).setOrigin(0, 0).setDepth(9);
+    this.hudWaveName = this.add.text(L.W / 2, 8, '', { fontFamily: TD.FONT, fontSize: '15px', color: C.muted }).setOrigin(0.5, 0).setDepth(9);
+    this.hudCore = this.add.text(L.W / 2, 34, '', { fontFamily: TD.FONT, fontSize: '13px', color: '#ffd166' }).setOrigin(0.5, 0).setDepth(9);
     this.banner = this.add.text(L.W / 2, L.GRID_Y + 140, '', { fontFamily: TD.FONT, fontSize: '22px', fontStyle: '700', color: C.text, backgroundColor: '#10140fd9', padding: { x: 14, y: 8 }, align: 'center' }).setOrigin(0.5).setAlpha(0).setDepth(20);
     // Boss bar
     this.bossBarBg = this.add.rectangle(L.W / 2, L.GRID_Y + 12, 400, 14, 0x000000, 0.7).setDepth(9).setVisible(false);
@@ -232,22 +234,22 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const L = TD.LAYOUT;
     this.add.rectangle(0, L.BAR_Y, L.W, L.BAR_H, 0x10140f).setOrigin(0).setDepth(9);
     // Row 1: build choices
-    const y1 = L.BAR_Y + 6, h1 = 58, bw = 72, gap = 4;
+    const y1 = L.BAR_Y + 6, h1 = 86, bw = 72, gap = 4;
     this.buildBtns = {};
-    const choices = this.lines.map((ln) => ({ id: ln.id, name: ln.name.toUpperCase(), tex: ln.turrets[0] + '_' + this.factionId })).concat([{ id: 'mine', name: 'MINES', tex: 'bullet_grey' }]);
+    const choices = this.lines.map((ln) => ({ id: ln.id, name: ln.name.toUpperCase(), tex: turretKey(this, ln, 1), plate: ln.id === 'beacon' ? 'plate_diamond_' + this.factionId : 'plate_' + this.factionId })).concat([{ id: 'mine', name: 'MINES', tex: 'bullet_grey' }]);
     choices.forEach((ch, i) => {
       const x = 4 + i * (bw + gap);
       const rect = this.add.rectangle(x, y1, bw, h1, 0x232b21).setOrigin(0).setStrokeStyle(2, 0x3a4536).setInteractive({ useHandCursor: true }).setDepth(9);
-      const plate = ch.id === 'mine' ? null : this.add.image(x + bw / 2, y1 + 22, 'plate').setScale(0.2).setDepth(9);
-      const icon = this.add.image(x + bw / 2, y1 + 22, ch.tex).setScale(ch.id === 'mine' ? 0.5 : 0.24).setDepth(9);
-      const name = this.add.text(x + bw / 2, y1 + 40, ch.name, { fontFamily: TD.FONT, fontSize: '8px', color: TD.COLOURS.text }).setOrigin(0.5, 0).setDepth(9);
-      const cost = this.add.text(x + bw / 2, y1 + 50, '', { fontFamily: TD.FONT, fontSize: '9px', color: TD.COLOURS.gold }).setOrigin(0.5, 0).setDepth(9);
+      const plate = ch.id === 'mine' ? null : this.add.image(x + bw / 2, y1 + 32, ch.plate).setScale(0.4).setDepth(9);
+      const icon = this.add.image(x + bw / 2, y1 + 32, ch.tex).setScale(ch.id === 'mine' ? 0.7 : 0.46).setDepth(9);
+      const name = this.add.text(x + bw / 2, y1 + 60, ch.name, { fontFamily: TD.FONT, fontSize: '10px', color: TD.COLOURS.text }).setOrigin(0.5, 0).setDepth(9);
+      const cost = this.add.text(x + bw / 2, y1 + 72, '', { fontFamily: TD.FONT, fontSize: '10px', color: TD.COLOURS.gold }).setOrigin(0.5, 0).setDepth(9);
       rect.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); TD.SFX.unlock(); this.setBuildMode(ch.id); });
       this.buildBtns[ch.id] = { rect, icon, plate, name, cost };
     });
     // Row 2: hint, send wave, speed, sound
-    const y2 = L.BAR_Y + 70, h2 = 48;
-    this.hint = this.add.text(8, y2 + 2, '', { fontFamily: TD.FONT, fontSize: '10px', color: TD.COLOURS.muted, wordWrap: { width: 236 }, lineSpacing: 2 }).setDepth(9);
+    const y2 = L.BAR_Y + 100, h2 = 50;
+    this.hint = this.add.text(8, y2 + 2, '', { fontFamily: TD.FONT, fontSize: '10px', color: TD.COLOURS.text, wordWrap: { width: 236 }, lineSpacing: 2 }).setDepth(9);
     this.btnStart = this.makeButton(250, y2, 166, h2, '', () => this.startWaveNow(), 9, 'next');
     this.btnSpeed = this.makeButton(422, y2, 54, h2, '', () => this.toggleSpeed(), 9, 'fastForward');
     this.btnSound = this.makeButton(480, y2, 52, h2, '', () => { const m = TD.SFX.toggle(); this.btnSound.img.setTexture(m ? 'ui_audioOff' : 'ui_audioOn'); }, 9, 'audioOn');
@@ -419,7 +421,7 @@ TD.GameScene = class GameScene extends Phaser.Scene {
   finishConstruction(t) {
     t.building = 0;
     t.site.setVisible(false);
-    t.turret.setTexture(t.line.turrets[t.tier - 1] + '_' + this.factionId).setScale(TURRET_SCALE[t.tier - 1]).setVisible(true);
+    t.turret.setTexture(turretKey(this, t.line, t.tier)).setScale(TURRET_SCALE[t.tier - 1]).setVisible(true);
     TD.SFX.done();
     if (this.selected === t) this.refreshPanel();
   }
@@ -478,8 +480,8 @@ TD.GameScene = class GameScene extends Phaser.Scene {
     const x = this.cellX(c), y = this.cellY(r);
     const t = { c, r, type: 'tower', line: lineDef, tier: 1, overclock: 0, value: cost, cooldown: 0, building: 0, sprites: [] };
     t.site = this.add.image(x, y, 'site').setScale(TILE).setVisible(false);
-    t.base = this.add.image(x, y, lineDef.id === 'beacon' ? 'plate_diamond' : 'plate').setScale(TILE);
-    t.turret = this.add.image(x, y, lineDef.turrets[0] + '_' + this.factionId).setScale(TURRET_SCALE[0]);
+    t.base = this.add.image(x, y, (lineDef.id === 'beacon' ? 'plate_diamond_' : 'plate_') + this.factionId).setScale(TILE);
+    t.turret = this.add.image(x, y, turretKey(this, lineDef, 1)).setScale(TURRET_SCALE[0]);
     t.flash = this.add.image(x, y, 'flash').setScale(0.25).setVisible(false);
     t.sprites.push(t.base, t.turret, t.site, t.flash);
     this.towerLayer.add([t.base, t.turret, t.site]);

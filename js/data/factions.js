@@ -127,6 +127,9 @@ TD.FACTIONS = {
 
 TD.FACTION_ORDER = ['federation', 'union', 'motherland', 'dynasty'];
 
+// Colour of each tower line's turret. The base plate carries the faction colour.
+TD.LINE_COLOURS = { gunner: 0xc2ccd8, flak: 0xf0d25a, artillery: 0x8fb06a, sniper: 0x5a5f6e, beacon: 0x8fe6ff, special: null };
+
 // The tower lines a faction can build: shared lines with modifiers, then its special.
 TD.factionLines = function (factionId) {
   const f = TD.FACTIONS[factionId];

@@ -6,11 +6,11 @@ window.TD = window.TD || {};
 TD.LAYOUT = {
   W: 540,
   H: 960,
-  HUD_H: 70,
+  HUD_H: 62,
   COLS: 12,
-  ROWS: 17,
+  ROWS: 16,
   CELL: 45,
-  BAR_H: 125,
+  BAR_H: 158,
 };
 TD.LAYOUT.GRID_Y = TD.LAYOUT.HUD_H;
 TD.LAYOUT.GRID_H = TD.LAYOUT.ROWS * TD.LAYOUT.CELL;
